@@ -1,0 +1,313 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model School {
+  id        String   @id @default(uuid())
+  name      String
+  code      String   @unique
+  address   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users       User[]
+  students    Student[]
+  parents     Parent[]
+  teachers    Teacher[]
+  drivers     Driver[]
+  buses       Bus[]
+  routes      Route[]
+  devices           Device[]
+  cameras           Camera[]
+  sensors           Sensor[]
+  emergencies       EmergencyIncident[]
+  deviceCredentials DeviceCredential[]
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  name      String
+  role      String   @default("PARENT") // SUPER_ADMIN, ADMIN, TEACHER, DRIVER, PARENT
+  schoolId  String?
+  school    School?  @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  parent        Parent?
+  teacher       Teacher?
+  driver        Driver?
+  notifications Notification[]
+}
+
+model Parent {
+  id        String   @id @default(uuid())
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  phone     String
+  address   String?
+  schoolId  String
+  school    School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  students  Student[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Teacher {
+  id            String   @id @default(uuid())
+  userId        String   @unique
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  schoolId      String
+  school        School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  assignedClass String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model Driver {
+  id            String   @id @default(uuid())
+  userId        String   @unique
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  phone         String
+  licenseNumber String
+  schoolId      String
+  school        School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  bus           Bus?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model Bus {
+  id                 String              @id @default(uuid())
+  busNumber          String              @unique
+  registrationNumber String              @unique
+  driverId           String?             @unique
+  driver             Driver?             @relation(fields: [driverId], references: [id])
+  routeId            String?
+  route              Route?              @relation(fields: [routeId], references: [id])
+  schoolId           String
+  school             School              @relation(fields: [schoolId], references: [id])
+  status             String              @default("INACTIVE") // ACTIVE, INACTIVE, IN_TRANSIT, MAINTENANCE
+  maxSpeed           Float               @default(50.0)
+  students           Student[]
+  locations          BusLocation[]
+  alerts             Alert[]
+  emergencies        EmergencyIncident[]
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+}
+
+model Route {
+  id         String    @id @default(uuid())
+  name       String
+  schoolId   String
+  school     School    @relation(fields: [schoolId], references: [id])
+  startPoint String
+  endPoint   String
+  stops      BusStop[]
+  buses      Bus[]
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+}
+
+model BusStop {
+  id        String   @id @default(uuid())
+  routeId   String
+  route     Route    @relation(fields: [routeId], references: [id], onDelete: Cascade)
+  name      String
+  latitude  Float
+  longitude Float
+  sequence  Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Student {
+  id          String        @id @default(uuid())
+  name        String
+  rollNumber  String
+  className   String
+  section     String
+  photo       String?
+  rfidCardId  String        @unique
+  parentId    String?
+  parent      Parent?       @relation(fields: [parentId], references: [id])
+  busId       String?
+  bus         Bus?          @relation(fields: [busId], references: [id])
+  schoolId    String
+  school      School        @relation(fields: [schoolId], references: [id])
+  status      String        @default("ACTIVE") // ACTIVE, INACTIVE, GRADUATED
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  attendances Attendance[]
+  alerts      Alert[]
+}
+
+model Attendance {
+  id        String    @id @default(uuid())
+  studentId String
+  student   Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  date      DateTime
+  checkIn   DateTime?
+  checkOut  DateTime?
+  deviceId  String?
+  status    String    @default("PRESENT") // PRESENT, ABSENT, LATE, BOARDED_BUS, LEFT_BUS
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+model BusLocation {
+  id        String   @id @default(uuid())
+  busId     String
+  bus       Bus      @relation(fields: [busId], references: [id], onDelete: Cascade)
+  latitude  Float
+  longitude Float
+  speed     Float
+  timestamp DateTime @default(now())
+}
+
+model Alert {
+  id        String   @id @default(uuid())
+  busId     String?
+  bus       Bus?     @relation(fields: [busId], references: [id])
+  studentId String?
+  student   Student? @relation(fields: [studentId], references: [id])
+  type      String   // OVERSPEED, ROUTE_DEVIATION, LONG_STOP, DEVICE_OFFLINE, ATTENDANCE_MISMATCH, SENSOR_THRESHOLD, UNUSUAL_ACTIVITY
+  message   String
+  severity  String   @default("MEDIUM") // LOW, MEDIUM, HIGH, CRITICAL
+  resolved  Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  message   String
+  type      String   @default("INFO")
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
+model Device {
+  id        String   @id @default(uuid())
+  deviceId  String   @unique
+  type      String   // RFID_READER, GPS_TRACKER, GATEWAY
+  schoolId  String
+  school    School   @relation(fields: [schoolId], references: [id])
+  status    String   @default("ONLINE")
+  lastSeen  DateTime @default(now())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Camera {
+  id            String        @id @default(uuid())
+  name          String
+  cameraId      String        @unique
+  location      String
+  building      String
+  zone          String
+  cameraType    String        // CCTV, IP_CAMERA, RTSP_CAMERA
+  streamUrl     String?
+  status        String        @default("ONLINE") // ONLINE, OFFLINE, WARNING
+  lastHeartbeat DateTime      @default(now())
+  schoolId      String
+  school        School        @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  events        CameraEvent[]
+}
+
+model CameraEvent {
+  id            String   @id @default(uuid())
+  cameraId      String
+  camera        Camera   @relation(fields: [cameraId], references: [id], onDelete: Cascade)
+  detectionType String   // PERSON_DETECTED, VEHICLE_DETECTED, CROWD_DETECTED, UNAUTHORIZED_AREA_ACTIVITY, ABANDONED_OBJECT, RESTRICTED_AREA_ENTRY, UNUSUAL_ACTIVITY
+  zone          String
+  confidence    Float
+  snapshotUrl   String?
+  timestamp     DateTime @default(now())
+  metadata      String?  // JSON formatted extra details
+}
+
+model Sensor {
+  id            String          @id @default(uuid())
+  sensorId      String          @unique
+  name          String
+  sensorType    String          // TEMPERATURE, HUMIDITY, AIR_QUALITY, SMOKE, DOOR, WATER_LEVEL, MOTION
+  location      String
+  building      String
+  room          String
+  status        String          @default("ONLINE") // ONLINE, OFFLINE, WARNING
+  lastHeartbeat DateTime        @default(now())
+  latestReading String?
+  schoolId      String
+  school        School          @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  readings      SensorReading[]
+}
+
+model SensorReading {
+  id         String   @id @default(uuid())
+  sensorId   String
+  sensor     Sensor   @relation(fields: [sensorId], references: [id], onDelete: Cascade)
+  sensorType String
+  value      Float
+  unit       String
+  rawPayload String?
+  timestamp  DateTime @default(now())
+}
+
+model EmergencyIncident {
+  id                String          @id @default(uuid())
+  incidentType      String          // BUS_EMERGENCY, STUDENT_EMERGENCY, FIRE, MEDICAL_EMERGENCY, SECURITY_INCIDENT, UNAUTHORIZED_ACCESS, IOT_SAFETY_ALERT
+  severity          String          @default("HIGH") // LOW, MEDIUM, HIGH, CRITICAL
+  status            String          @default("OPEN") // OPEN, ACKNOWLEDGED, IN_PROGRESS, RESOLVED
+  location          String
+  building          String?
+  busId             String?
+  bus               Bus?            @relation(fields: [busId], references: [id])
+  reporterId        String?
+  assignedResponder String?
+  schoolId          String
+  school            School          @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  events            IncidentEvent[]
+}
+
+model IncidentEvent {
+  id          String            @id @default(uuid())
+  incidentId  String
+  incident    EmergencyIncident @relation(fields: [incidentId], references: [id], onDelete: Cascade)
+  action      String            // SOS_TRIGGERED, ACKNOWLEDGED, RESPONDER_ASSIGNED, STATUS_UPDATED, RESOLVED
+  description String
+  performedBy String?
+  timestamp   DateTime          @default(now())
+}
+
+model DeviceCredential {
+  id              String   @id @default(uuid())
+  deviceId        String   @unique
+  token           String   @unique
+  deviceType      String   // RFID_READER, GPS_TRACKER, ESP32, IOT_SENSOR, CCTV_CAMERA
+  schoolId        String
+  school          School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  location        String?
+  status          String   @default("ACTIVE")
+  firmwareVersion String   @default("1.0.0")
+  lastSeen        DateTime @default(now())
+  metadata        String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
