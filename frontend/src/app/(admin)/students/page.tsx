@@ -28,6 +28,8 @@ export default function StudentsPage() {
 
   // Add Modal State
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [parentMode, setParentMode] = useState<"SELECT" | "CREATE">("CREATE");
+
   const [formData, setFormData] = useState({
     name: "",
     rollNumber: "",
@@ -36,6 +38,9 @@ export default function StudentsPage() {
     rfidCardId: "",
     busId: "",
     parentId: "",
+    newParentName: "",
+    newParentEmail: "",
+    newParentPhone: "",
   });
 
   // Dedicated Quick Edit Modals
@@ -93,11 +98,24 @@ export default function StudentsPage() {
     e.preventDefault();
     setSubmitting(true);
     try {
+      const payload = {
+        name: formData.name,
+        rollNumber: formData.rollNumber,
+        className: formData.className,
+        section: formData.section,
+        rfidCardId: formData.rfidCardId,
+        busId: formData.busId || null,
+        parentId: parentMode === "SELECT" ? formData.parentId || null : null,
+        newParentName: parentMode === "CREATE" ? formData.newParentName : "",
+        newParentEmail: parentMode === "CREATE" ? formData.newParentEmail : "",
+        newParentPhone: parentMode === "CREATE" ? formData.newParentPhone : "",
+      };
+
       const res = await fetch(`${API_BASE_URL}/students`, {
         method: "POST",
         headers: getAuthHeaders(),
         credentials: "include",
-        body: JSON.stringify(formData),
+        body: JSON.stringify(payload),
       });
       const data = await res.json();
       if (data.success) {
@@ -110,8 +128,12 @@ export default function StudentsPage() {
           rfidCardId: "",
           busId: "",
           parentId: "",
+          newParentName: "",
+          newParentEmail: "",
+          newParentPhone: "",
         });
         fetchStudents();
+        fetchBusesAndParents();
       } else {
         alert(data.message || "Failed to create student");
       }
@@ -382,99 +404,189 @@ export default function StudentsPage() {
         </div>
       </div>
 
-      {/* Add Student Modal */}
+      {/* ALL-IN-ONE SMART ADD STUDENT MODAL */}
       {isAddModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-          <div className="w-full max-w-md bg-white dark:bg-gray-900 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-800 p-6 space-y-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm overflow-y-auto">
+          <div className="w-full max-w-lg bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-800 p-6 space-y-4 my-8">
             <div className="flex items-center justify-between border-b pb-3 border-gray-200 dark:border-gray-800">
-              <h3 className="font-bold text-lg text-gray-900 dark:text-white">Add New Student</h3>
+              <div>
+                <h3 className="font-bold text-lg text-gray-900 dark:text-white">Add New Student & Parent</h3>
+                <p className="text-xs text-gray-500">Create student profile and link/create parent in 1 single step</p>
+              </div>
               <button onClick={() => setIsAddModalOpen(false)} className="text-gray-400 hover:text-gray-600 text-xl font-bold">
                 ×
               </button>
             </div>
+
             <form onSubmit={handleCreateStudent} className="space-y-4">
-              <div>
-                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Full Name</label>
-                <input
-                  type="text"
-                  required
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="e.g. Rahul Sharma"
-                  className="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
+              {/* SECTION 1: STUDENT INFO */}
+              <div className="space-y-3 bg-gray-50 dark:bg-gray-800/50 p-4 rounded-xl border border-gray-200/80 dark:border-gray-700/60">
+                <span className="text-xs font-bold uppercase tracking-wider text-brand-600 dark:text-brand-400 block">
+                  1. Student Information
+                </span>
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Roll Number</label>
+                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Student Full Name</label>
                   <input
                     type="text"
                     required
-                    value={formData.rollNumber}
-                    onChange={(e) => setFormData({ ...formData, rollNumber: e.target.value })}
-                    placeholder="e.g. 709"
-                    className="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    placeholder="e.g. Rahul Sharma"
+                    className="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
                   />
                 </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Class</label>
-                  <select
-                    value={formData.className}
-                    onChange={(e) => setFormData({ ...formData, className: e.target.value })}
-                    className="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-                  >
-                    <option value="7-A">7-A</option>
-                    <option value="8-B">8-B</option>
-                    <option value="9-A">9-A</option>
-                    <option value="10-A">10-A</option>
-                  </select>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Roll Number</label>
+                    <input
+                      type="text"
+                      required
+                      value={formData.rollNumber}
+                      onChange={(e) => setFormData({ ...formData, rollNumber: e.target.value })}
+                      placeholder="e.g. 709"
+                      className="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-white font-mono"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Class / Grade</label>
+                    <select
+                      value={formData.className}
+                      onChange={(e) => setFormData({ ...formData, className: e.target.value })}
+                      className="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                    >
+                      <option value="7-A">Grade 7-A</option>
+                      <option value="8-B">Grade 8-B</option>
+                      <option value="9-A">Grade 9-A</option>
+                      <option value="10-A">Grade 10-A</option>
+                      <option value="11-A">Grade 11-A</option>
+                      <option value="12-A">Grade 12-A</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">RFID Card Tag ID</label>
+                    <input
+                      type="text"
+                      required
+                      value={formData.rfidCardId}
+                      onChange={(e) => setFormData({ ...formData, rfidCardId: e.target.value })}
+                      placeholder="e.g. RFID-10026"
+                      className="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-white font-mono"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Assigned Bus (Optional)</label>
+                    <select
+                      value={formData.busId}
+                      onChange={(e) => setFormData({ ...formData, busId: e.target.value })}
+                      className="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                    >
+                      <option value="">-- No Bus --</option>
+                      {buses.map((bus) => (
+                        <option key={bus.id} value={bus.id}>
+                          🚌 {bus.busNumber}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
               </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">RFID Card Tag ID</label>
-                <input
-                  type="text"
-                  required
-                  value={formData.rfidCardId}
-                  onChange={(e) => setFormData({ ...formData, rfidCardId: e.target.value })}
-                  placeholder="e.g. RFID-10026"
-                  className="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white font-mono"
-                />
+
+              {/* SECTION 2: PARENT SELECTION TOGGLE */}
+              <div className="space-y-3 bg-indigo-50/60 dark:bg-indigo-950/30 p-4 rounded-xl border border-indigo-200/80 dark:border-indigo-800/50">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold uppercase tracking-wider text-indigo-700 dark:text-indigo-300 block">
+                    2. Parent Contact Details
+                  </span>
+                  <div className="inline-flex rounded-lg bg-white dark:bg-gray-900 p-0.5 border border-indigo-200 dark:border-indigo-800">
+                    <button
+                      type="button"
+                      onClick={() => setParentMode("CREATE")}
+                      className={`px-2.5 py-1 text-xs font-semibold rounded-md transition-all ${
+                        parentMode === "CREATE"
+                          ? "bg-indigo-600 text-white shadow-sm"
+                          : "text-gray-500 hover:text-gray-900 dark:text-gray-400"
+                      }`}
+                    >
+                      + Create New Parent
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setParentMode("SELECT")}
+                      className={`px-2.5 py-1 text-xs font-semibold rounded-md transition-all ${
+                        parentMode === "SELECT"
+                          ? "bg-indigo-600 text-white shadow-sm"
+                          : "text-gray-500 hover:text-gray-900 dark:text-gray-400"
+                      }`}
+                    >
+                      Select Existing
+                    </button>
+                  </div>
+                </div>
+
+                {parentMode === "CREATE" ? (
+                  <div className="space-y-3 pt-1">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Parent Full Name</label>
+                      <input
+                        type="text"
+                        required={parentMode === "CREATE"}
+                        value={formData.newParentName}
+                        onChange={(e) => setFormData({ ...formData, newParentName: e.target.value })}
+                        placeholder="e.g. Vikram Sharma"
+                        className="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Parent Login Email</label>
+                        <input
+                          type="email"
+                          required={parentMode === "CREATE"}
+                          value={formData.newParentEmail}
+                          onChange={(e) => setFormData({ ...formData, newParentEmail: e.target.value })}
+                          placeholder="e.g. vikram.sharma@gmail.com"
+                          className="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Parent Phone</label>
+                        <input
+                          type="text"
+                          value={formData.newParentPhone}
+                          onChange={(e) => setFormData({ ...formData, newParentPhone: e.target.value })}
+                          placeholder="e.g. 9876543210"
+                          className="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                        />
+                      </div>
+                    </div>
+                    <p className="text-[11px] text-indigo-600 dark:text-indigo-400 italic">
+                      ✨ Parent account automatically creates with login credentials and links to this student.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="pt-1">
+                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Choose Existing Registered Parent</label>
+                    <select
+                      value={formData.parentId}
+                      onChange={(e) => setFormData({ ...formData, parentId: e.target.value })}
+                      className="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                    >
+                      <option value="">-- No Parent Linked --</option>
+                      {parents.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          👤 {p.user?.name || "Parent"} ({p.user?.email || p.phone})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
               </div>
 
-              <div>
-                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Assign School Bus (Optional)</label>
-                <select
-                  value={formData.busId}
-                  onChange={(e) => setFormData({ ...formData, busId: e.target.value })}
-                  className="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-                >
-                  <option value="">-- No Bus Assigned --</option>
-                  {buses.map((bus) => (
-                    <option key={bus.id} value={bus.id}>
-                      🚌 {bus.busNumber} ({bus.registrationNumber})
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Link Parent Contact (Optional)</label>
-                <select
-                  value={formData.parentId}
-                  onChange={(e) => setFormData({ ...formData, parentId: e.target.value })}
-                  className="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-                >
-                  <option value="">-- No Parent Linked --</option>
-                  {parents.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      👤 {p.user?.name || "Parent"} ({p.user?.email || p.phone})
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="flex justify-end gap-3 pt-3">
+              <div className="flex justify-end gap-3 pt-2">
                 <button
                   type="button"
                   onClick={() => setIsAddModalOpen(false)}
@@ -485,9 +597,9 @@ export default function StudentsPage() {
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="px-4 py-2 text-sm font-medium bg-brand-500 hover:bg-brand-600 text-white rounded-lg disabled:opacity-50"
+                  className="px-5 py-2 text-sm font-semibold bg-brand-500 hover:bg-brand-600 text-white rounded-lg disabled:opacity-50 shadow-sm"
                 >
-                  {submitting ? "Saving..." : "Save Student"}
+                  {submitting ? "Creating Student & Parent..." : "Create Student & Link Parent"}
                 </button>
               </div>
             </form>
