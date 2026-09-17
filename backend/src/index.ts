@@ -26,6 +26,7 @@ import cameraRoutes from './routes/cameraRoutes.js';
 import iotRoutes from './routes/iotRoutes.js';
 import emergencyRoutes from './routes/emergencyRoutes.js';
 import commandCenterRoutes from './routes/commandCenterRoutes.js';
+import whatsappRoutes from './routes/whatsappRoutes.js';
 
 dotenv.config();
 
@@ -102,6 +103,7 @@ app.use('/api/cameras', cameraRoutes);
 app.use('/api/iot', iotRoutes);
 app.use('/api/emergency', emergencyRoutes);
 app.use('/api/command-center', commandCenterRoutes);
+app.use('/api/whatsapp', whatsappRoutes);
 
 // Centralized Error Handler
 app.use(errorHandler);

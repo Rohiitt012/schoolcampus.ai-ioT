@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { useSocket } from "@/context/SocketContext";
-import { API_BASE_URL } from "@/context/AuthContext";
+import { API_BASE_URL, getAuthHeaders } from "@/context/AuthContext";
 
 export default function RFIDSimulatorPage() {
   const { socket, isConnected } = useSocket();
@@ -45,7 +45,8 @@ export default function RFIDSimulatorPage() {
     try {
       const res = await fetch(`${API_BASE_URL}/attendance/scan`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: getAuthHeaders(),
+        credentials: "include",
         body: JSON.stringify({ rfidCardId, deviceId }),
       });
 
@@ -68,53 +69,57 @@ export default function RFIDSimulatorPage() {
       <div>
         <div className="flex items-center gap-2 mb-1">
           <span className="px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300">
-            IoT Simulator
+            Hardware Integration Testing
           </span>
-          <span className={`text-xs font-semibold px-2 py-0.5 rounded ${isConnected ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>
-            {isConnected ? "🟢 Realtime Hub Connected" : "🔴 Disconnected"}
+          <span className={`px-2.5 py-0.5 rounded-full text-xs font-mono font-bold ${
+            isConnected ? "bg-emerald-100 text-emerald-800" : "bg-red-100 text-red-800"
+          }`}>
+            Socket: {isConnected ? "ONLINE 🟢" : "OFFLINE 🔴"}
           </span>
         </div>
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">RFID Attendance Gate Simulator</h1>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">RFID Gate Scanner Simulator</h1>
         <p className="text-sm text-gray-500 dark:text-gray-400">
-          Simulate real hardware RFID readers scanning student smart cards at school entry gates.
+          Simulate RFID card taps from IoT gate readers and trigger automated WhatsApp parent alerts in real-time.
         </p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Simulator Control Panel */}
-        <div className="p-6 rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 shadow-sm space-y-5">
-          <h2 className="font-bold text-lg text-gray-900 dark:text-white flex items-center gap-2">
-            <span>💳 Tap RFID Smart Card</span>
+        {/* Scanner Terminal Card */}
+        <div className="p-6 rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 shadow-sm space-y-6">
+          <h2 className="font-bold text-lg text-gray-900 dark:text-white border-b border-gray-100 dark:border-gray-800 pb-3">
+            💳 Tap RFID Card
           </h2>
 
-          {/* Quick Preset Selector */}
+          {/* Quick Presets */}
           <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-gray-400 mb-2">
-              Select Demo Student Card
+            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+              Select Preset Student RFID Card
             </label>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {presetCards.map((p) => (
+              {presetCards.map((preset) => (
                 <button
-                  key={p.card}
+                  key={preset.card}
                   type="button"
-                  onClick={() => setRfidCardId(p.card)}
-                  className={`p-2.5 rounded-xl border text-left text-xs font-medium transition-all ${
-                    rfidCardId === p.card
-                      ? "border-brand-500 bg-brand-50 dark:bg-brand-900/20 text-brand-700 dark:text-brand-300 font-bold shadow-sm"
+                  onClick={() => {
+                    setRfidCardId(preset.card);
+                  }}
+                  className={`p-2.5 rounded-xl border text-left text-xs transition-all ${
+                    rfidCardId === preset.card
+                      ? "border-brand-500 bg-brand-50/50 dark:bg-brand-900/20 text-brand-700 dark:text-brand-300 font-bold shadow-sm"
                       : "border-gray-200 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300"
                   }`}
                 >
-                  <span className="block font-mono text-[11px] text-gray-400">{p.card}</span>
-                  <span>{p.name}</span>
+                  <p className="font-mono text-[11px] text-gray-400">{preset.card}</p>
+                  <p className="truncate font-semibold">{preset.name}</p>
                 </button>
               ))}
             </div>
           </div>
 
-          <form onSubmit={handleScan} className="space-y-4 pt-2">
+          <form onSubmit={handleScan} className="space-y-4">
             <div>
               <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                RFID Card ID
+                Custom RFID Card Tag ID
               </label>
               <input
                 type="text"
@@ -122,7 +127,7 @@ export default function RFIDSimulatorPage() {
                 value={rfidCardId}
                 onChange={(e) => setRfidCardId(e.target.value)}
                 placeholder="e.g. RFID-10001"
-                className="w-full px-4 py-2.5 font-mono text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                className="w-full px-4 py-2.5 text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white font-mono"
               />
             </div>
 
@@ -152,16 +157,31 @@ export default function RFIDSimulatorPage() {
 
           {/* Scan Feedback Result Card */}
           {scanResult && (
-            <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200 dark:bg-emerald-900/20 dark:border-emerald-800 text-emerald-900 dark:text-emerald-200 animate-fade-in space-y-2">
-              <div className="flex items-center gap-2 font-bold text-sm">
-                <span>✅ Attendance Recorded Successfully!</span>
+            <div className="space-y-3">
+              <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200 dark:bg-emerald-900/20 dark:border-emerald-800 text-emerald-900 dark:text-emerald-200 animate-fade-in space-y-2">
+                <div className="flex items-center gap-2 font-bold text-sm">
+                  <span>✅ Attendance Recorded Successfully!</span>
+                </div>
+                <div className="text-xs space-y-1">
+                  <p><strong>Student:</strong> {scanResult.student?.name} (Class {scanResult.student?.className})</p>
+                  <p><strong>Device:</strong> {deviceId}</p>
+                  <p><strong>Time:</strong> {new Date().toLocaleTimeString()}</p>
+                  <p><strong>Status:</strong> <span className="font-bold">{scanResult.attendance?.status}</span></p>
+                </div>
               </div>
-              <div className="text-xs space-y-1">
-                <p><strong>Student:</strong> {scanResult.student?.name} (Class {scanResult.student?.className})</p>
-                <p><strong>Device:</strong> {deviceId}</p>
-                <p><strong>Time:</strong> {new Date().toLocaleTimeString()}</p>
-                <p><strong>Status:</strong> <span className="font-bold">{scanResult.attendance?.status}</span></p>
-              </div>
+
+              {/* AUTOMATED WHATSAPP NOTIFICATION PREVIEW BUBBLE */}
+              {scanResult.whatsappLog && (
+                <div className="p-4 rounded-2xl bg-emerald-950 text-emerald-100 border border-emerald-800 text-xs space-y-2 shadow-lg animate-fade-in">
+                  <div className="flex items-center justify-between text-[11px] text-emerald-400 font-mono font-bold border-b border-emerald-900 pb-1.5">
+                    <span>💬 AUTOMATED WHATSAPP DISPATCHED</span>
+                    <span className="text-emerald-300 bg-emerald-900/50 px-2 py-0.5 rounded">TO: {scanResult.whatsappLog.toPhone} ✅</span>
+                  </div>
+                  <p className="whitespace-pre-line text-xs pt-1 leading-relaxed text-emerald-200 font-sans">
+                    {scanResult.whatsappLog.content}
+                  </p>
+                </div>
+              )}
             </div>
           )}
 
@@ -179,7 +199,7 @@ export default function RFIDSimulatorPage() {
             <span className="text-xs font-mono font-normal text-gray-400">Stream active</span>
           </h2>
 
-          <div className="space-y-2 max-h-[420px] overflow-y-auto pr-1">
+          <div className="space-y-2 max-h-[460px] overflow-y-auto pr-1">
             {scanLogs.length === 0 ? (
               <div className="p-8 text-center text-gray-400 text-xs italic border border-dashed rounded-xl">
                 No card scans recorded yet in this session. Click &quot;SCAN CARD NOW&quot; to test.
@@ -188,19 +208,21 @@ export default function RFIDSimulatorPage() {
               scanLogs.map((log, idx) => (
                 <div
                   key={idx}
-                  className="p-3 rounded-xl border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/60 flex items-center justify-between text-xs transition-all hover:bg-gray-100"
+                  className="p-3.5 rounded-xl border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/60 flex items-center justify-between text-xs transition-all hover:bg-gray-100"
                 >
                   <div className="space-y-0.5">
                     <p className="font-bold text-gray-900 dark:text-white">{log.studentName}</p>
                     <p className="text-gray-500">Grade {log.className} • Device <span className="font-mono">{log.deviceId}</span></p>
+                    {log.whatsappLog && (
+                      <p className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1 mt-1">
+                        💬 WhatsApp Dispatched to {log.whatsappLog.toPhone}
+                      </p>
+                    )}
                   </div>
                   <div className="text-right">
                     <span className="px-2 py-0.5 rounded font-bold text-[10px] bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300">
                       {log.status}
                     </span>
-                    <p className="font-mono text-[10px] text-gray-400 mt-1">
-                      {new Date(log.timestamp).toLocaleTimeString()}
-                    </p>
                   </div>
                 </div>
               ))

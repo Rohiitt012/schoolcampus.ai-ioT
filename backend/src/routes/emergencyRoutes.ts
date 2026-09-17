@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { authenticateJWT, authorizeRoles, AuthenticatedRequest } from '../middleware/auth.js';
 import { prisma } from '../config/prisma.js';
 import { emitEmergencySOSEvent, emitAlertEvent } from '../sockets/socketManager.js';
+import { sendWhatsAppNotification } from '../services/whatsappService.js';
 
 const router = Router();
 

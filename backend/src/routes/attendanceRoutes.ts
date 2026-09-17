@@ -2,37 +2,31 @@ import { Router } from 'express';
 import { authenticateJWT, authorizeRoles } from '../middleware/auth.js';
 import { prisma } from '../config/prisma.js';
 import { emitAttendanceScanEvent } from '../sockets/socketManager.js';
+import { sendWhatsAppNotification } from '../services/whatsappService.js';
 
 const router = Router();
 
-router.get('/', authenticateJWT, async (req, res, next) => {
+// GET attendance records
+router.get('/', authenticateJWT, authorizeRoles('SUPER_ADMIN', 'ADMIN', 'TEACHER'), async (req, res, next) => {
   try {
-    const { date, className, studentId } = req.query;
+    const { studentId, className, date } = req.query;
+
     const where: any = {};
-
+    if (studentId) where.studentId = studentId as string;
+    if (className) where.student = { className: className as string };
     if (date) {
-      const d = new Date(String(date));
-      d.setHours(0, 0, 0, 0);
-      const nextD = new Date(d);
-      nextD.setDate(nextD.getDate() + 1);
-      where.date = { gte: d, lt: nextD };
-    }
-
-    if (studentId) {
-      where.studentId = String(studentId);
-    }
-
-    if (className) {
-      where.student = { className: String(className) };
+      const targetDate = new Date(date as string);
+      targetDate.setHours(0, 0, 0, 0);
+      const nextDay = new Date(targetDate);
+      nextDay.setDate(nextDay.getDate() + 1);
+      where.date = { gte: targetDate, lt: nextDay };
     }
 
     const attendances = await prisma.attendance.findMany({
       where,
       include: {
         student: {
-          include: {
-            parent: { include: { user: { select: { name: true } } } },
-          },
+          select: { id: true, name: true, rollNumber: true, className: true, rfidCardId: true },
         },
       },
       orderBy: { date: 'desc' },
@@ -85,6 +79,7 @@ router.post('/scan', async (req, res, next) => {
     });
 
     const now = new Date();
+    let isCheckOut = false;
 
     if (!attendance) {
       attendance = await prisma.attendance.create({
@@ -97,7 +92,7 @@ router.post('/scan', async (req, res, next) => {
         },
       });
     } else {
-      // Toggle checkout / boarding status if already checked in
+      isCheckOut = true;
       attendance = await prisma.attendance.update({
         where: { id: attendance.id },
         data: {
@@ -107,7 +102,7 @@ router.post('/scan', async (req, res, next) => {
       });
     }
 
-    // Create notification for parent if linked
+    // Create system notification for parent
     if (student.parent?.userId) {
       await prisma.notification.create({
         data: {
@@ -117,6 +112,24 @@ router.post('/scan', async (req, res, next) => {
           type: 'ATTENDANCE',
         },
       });
+    }
+
+    // DISPATCH INSTANT WHATSAPP ALERT TO PARENT
+    let whatsappLog = null;
+    if (student.parent) {
+      const parentName = student.parent.user?.name || 'Parent';
+      const toPhone = student.parent.phone || '9876543210';
+      const waResult = await sendWhatsAppNotification({
+        toPhone,
+        parentName,
+        studentName: student.name,
+        messageType: isCheckOut ? 'GATE_EXIT' : 'GATE_ENTRY',
+        details: {
+          time: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          rfidCardId,
+        },
+      });
+      whatsappLog = waResult.log;
     }
 
     // Emit Realtime Event
@@ -129,6 +142,7 @@ router.post('/scan', async (req, res, next) => {
       checkInTime: attendance.checkIn,
       checkOutTime: attendance.checkOut,
       status: attendance.status,
+      whatsappLog,
       timestamp: now,
     };
 
@@ -139,6 +153,7 @@ router.post('/scan', async (req, res, next) => {
       message: `RFID Scan recorded for ${student.name}`,
       student,
       attendance,
+      whatsappLog,
     });
   } catch (err) {
     next(err);
