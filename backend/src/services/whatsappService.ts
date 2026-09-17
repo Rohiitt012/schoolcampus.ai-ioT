@@ -35,7 +35,13 @@ const whatsappLogs: WhatsAppLogRecord[] = [];
 export const sendWhatsAppNotification = async (payload: WhatsAppMessagePayload): Promise<{ success: boolean; message: string; log: WhatsAppLogRecord }> => {
   const { toPhone, parentName = 'Parent', studentName = 'Student', messageType, details } = payload;
   const timeStr = details?.time || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  const cleanPhone = toPhone ? toPhone.replace(/[^0-9+]/g, '') : '+919876543210';
+
+  // Clean phone number: keep digits only for UltraMsg API
+  let digitsOnly = toPhone ? toPhone.replace(/[^0-9]/g, '') : '919210728686';
+  if (digitsOnly.length === 10) {
+    digitsOnly = `91${digitsOnly}`;
+  }
+  const cleanPhone = `+${digitsOnly}`;
 
   let textContent = '';
 
@@ -62,12 +68,13 @@ export const sendWhatsAppNotification = async (payload: WhatsAppMessagePayload):
       break;
   }
 
-  // OPTIONAL REAL WHATSAPP GATEWAY DISPATCH (UltraMsg / CallMeBot)
-  const ultramsgInstance = process.env.ULTRAMSG_INSTANCE_ID;
-  const ultramsgToken = process.env.ULTRAMSG_TOKEN;
+  // REAL WHATSAPP GATEWAY DISPATCH (UltraMsg / CallMeBot)
+  const ultramsgInstance = process.env.ULTRAMSG_INSTANCE_ID || 'instance191838';
+  const ultramsgToken = process.env.ULTRAMSG_TOKEN || 'jujts1oiymx944e6';
   const callmebotApiKey = process.env.CALLMEBOT_API_KEY;
 
   let realDispatchSuccess = false;
+  let statusNote = ' (System Logged)';
 
   if (ultramsgInstance && ultramsgToken) {
     try {
@@ -76,12 +83,21 @@ export const sendWhatsAppNotification = async (payload: WhatsAppMessagePayload):
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: new URLSearchParams({
           token: ultramsgToken,
-          to: cleanPhone,
+          to: digitsOnly,
           body: textContent,
         }),
       });
-      const data = await response.json();
-      if (data.sent === 'true' || data.id) realDispatchSuccess = true;
+      const data: any = await response.json();
+      console.log('📱 [UltraMsg Gateway Response]:', data);
+
+      if (data.sent === 'true' || data.id) {
+        realDispatchSuccess = true;
+        if (data.message && data.message.includes('not authenticated')) {
+          statusNote = ' (Queued in UltraMsg - Please Scan QR Code in UltraMsg Dashboard)';
+        } else {
+          statusNote = ' (Real WhatsApp Delivered)';
+        }
+      }
     } catch (err) {
       console.error('UltraMsg real WhatsApp dispatch error:', err);
     }
@@ -90,6 +106,7 @@ export const sendWhatsAppNotification = async (payload: WhatsAppMessagePayload):
       const url = `https://api.callmebot.com/whatsapp.php?phone=${encodeURIComponent(cleanPhone)}&text=${encodeURIComponent(textContent)}&apikey=${callmebotApiKey}`;
       await fetch(url);
       realDispatchSuccess = true;
+      statusNote = ' (CallMeBot Delivered)';
     } catch (err) {
       console.error('CallMeBot real WhatsApp dispatch error:', err);
     }
@@ -108,11 +125,11 @@ export const sendWhatsAppNotification = async (payload: WhatsAppMessagePayload):
   whatsappLogs.unshift(logRecord);
   if (whatsappLogs.length > 50) whatsappLogs.pop();
 
-  console.log(`📱 [WhatsApp API Engine] Sent to ${cleanPhone} (Real Dispatch: ${realDispatchSuccess ? 'SUCCESS' : 'SIMULATED'}):\n${textContent}\n-----------------------------------`);
+  console.log(`📱 [WhatsApp API Engine] Sent to ${cleanPhone}${statusNote}:\n${textContent}\n-----------------------------------`);
 
   return {
     success: true,
-    message: `WhatsApp alert dispatched to ${cleanPhone} ${realDispatchSuccess ? '(Real WhatsApp Delivered)' : '(System Logged)'}`,
+    message: `WhatsApp alert dispatched to ${cleanPhone}${statusNote}`,
     log: logRecord,
   };
 };
