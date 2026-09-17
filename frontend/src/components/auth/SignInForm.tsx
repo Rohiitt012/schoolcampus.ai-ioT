@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { EyeCloseIcon, EyeIcon } from "@/icons";
+import LogoIcon from "@/components/common/LogoIcon";
 
 export default function SignInForm() {
   const { login } = useAuth();
@@ -39,9 +40,7 @@ export default function SignInForm() {
         {/* Brand Header */}
         <div>
           <div className="flex items-center gap-3 mb-4">
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-indigo-600 via-purple-600 to-indigo-700 flex items-center justify-center text-white font-black text-2xl shadow-lg shadow-indigo-500/20 ring-4 ring-indigo-500/10">
-              S
-            </div>
+            <LogoIcon className="w-12 h-12" />
             <div>
               <span className="font-black text-2xl tracking-tight text-slate-900 dark:text-white block leading-tight">
                 Smart Campus <span className="text-indigo-600 dark:text-indigo-400 font-extrabold">IoT</span>

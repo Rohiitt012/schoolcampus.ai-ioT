@@ -10,6 +10,11 @@ const outfit = Outfit({
 export const metadata = {
   title: 'Smart School IoT & AI Platform',
   description: 'Enterprise IoT & AI Platform for School Attendance, GPS Bus Tracking, Smart Alerts & Role Portals',
+  icons: {
+    icon: '/logo.svg',
+    shortcut: '/logo.svg',
+    apple: '/logo.svg',
+  },
 };
 
 export default function RootLayout({

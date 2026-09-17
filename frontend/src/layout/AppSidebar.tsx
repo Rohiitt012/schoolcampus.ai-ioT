@@ -139,6 +139,8 @@ const portalItems: NavItem[] = [
   },
 ];
 
+import LogoIcon from "@/components/common/LogoIcon";
+
 const AppSidebar: React.FC = () => {
   const { isExpanded, isMobileOpen, isHovered, setIsHovered } = useSidebar();
   const { user } = useAuth();
@@ -178,9 +180,7 @@ const AppSidebar: React.FC = () => {
         }`}
       >
         <Link href="/dashboard" className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-brand-600 to-indigo-500 flex items-center justify-center text-white font-bold text-xl shadow-md">
-            S
-          </div>
+          <LogoIcon className="w-10 h-10" />
           {(isExpanded || isHovered || isMobileOpen) && (
             <div className="flex flex-col">
               <span className="font-bold text-lg leading-tight tracking-tight text-gray-900 dark:text-white">
