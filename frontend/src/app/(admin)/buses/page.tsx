@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
-import { API_BASE_URL } from "@/context/AuthContext";
+import { API_BASE_URL, getAuthHeaders } from "@/context/AuthContext";
 
 export default function BusesPage() {
   const [buses, setBuses] = useState<any[]>([]);
@@ -20,7 +20,7 @@ export default function BusesPage() {
   const fetchBuses = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`${API_BASE_URL}/buses`, { credentials: "include" });
+      const res = await fetch(`${API_BASE_URL}/buses`, { headers: getAuthHeaders(), credentials: "include" });
       const data = await res.json();
       if (data.success) {
         setBuses(data.data);
@@ -42,7 +42,7 @@ export default function BusesPage() {
     try {
       const res = await fetch(`${API_BASE_URL}/buses`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: getAuthHeaders(),
         credentials: "include",
         body: JSON.stringify(formData),
       });

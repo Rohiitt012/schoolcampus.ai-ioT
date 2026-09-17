@@ -13,10 +13,11 @@ export const login = async (req: Request, res: Response, next: NextFunction): Pr
 
     const { user, token } = await loginUser(email, password);
 
+    const isProduction = process.env.NODE_ENV === 'production' || true;
     res.cookie('token', token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
+      secure: isProduction,
+      sameSite: isProduction ? 'none' : 'lax',
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     });
 

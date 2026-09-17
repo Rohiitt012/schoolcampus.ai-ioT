@@ -27,6 +27,14 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";
 
+export const getAuthHeaders = () => {
+  const token = typeof window !== "undefined" ? localStorage.getItem("auth_token") : null;
+  return {
+    "Content-Type": "application/json",
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+};
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
@@ -35,7 +43,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const refreshUser = async () => {
     try {
       const res = await fetch(`${API_BASE_URL}/auth/me`, {
-        headers: { "Content-Type": "application/json" },
+        headers: getAuthHeaders(),
         credentials: "include",
       });
       const data = await res.json();
@@ -66,6 +74,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       const data = await res.json();
       if (data.success && data.user) {
+        if (data.token && typeof window !== "undefined") {
+          localStorage.setItem("auth_token", data.token);
+        }
         setUser(data.user);
         
         // Redirect based on role
@@ -92,11 +103,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       await fetch(`${API_BASE_URL}/auth/logout`, {
         method: "POST",
+        headers: getAuthHeaders(),
         credentials: "include",
       });
     } catch (e) {
       console.error(e);
     } finally {
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("auth_token");
+      }
       setUser(null);
       router.push("/signin");
     }
