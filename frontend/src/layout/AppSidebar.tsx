@@ -45,6 +45,12 @@ const navItems: NavItem[] = [
     roles: ["SUPER_ADMIN", "ADMIN", "TEACHER"],
   },
   {
+    icon: <UserCircleIcon />,
+    name: "Parent Directory",
+    path: "/parents",
+    roles: ["SUPER_ADMIN", "ADMIN"],
+  },
+  {
     icon: <ListIcon />,
     name: "RFID Gate Simulator",
     path: "/attendance/simulator",
