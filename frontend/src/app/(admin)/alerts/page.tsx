@@ -16,12 +16,17 @@ export default function SmartAlertsPage() {
   const [filterSeverity, setFilterSeverity] = useState<string>("all");
 
   // WhatsApp Test State
-  const [testPhone, setTestPhone] = useState("+91 98765 43210");
+  const [testPhone, setTestPhone] = useState("+91 92107 28686");
   const [testParentName, setTestParentName] = useState("Vikram Sharma");
   const [testStudentName, setTestStudentName] = useState("Rahul Sharma");
   const [testType, setTestType] = useState("GATE_ENTRY");
   const [sendingWa, setSendingWa] = useState(false);
   const [lastSentWa, setLastSentWa] = useState<any>(null);
+
+  // Broadcast Modal State
+  const [isBroadcastOpen, setIsBroadcastOpen] = useState(false);
+  const [broadcastText, setBroadcastText] = useState("Dear Parents, School will remain closed tomorrow on account of extreme weather conditions. Stay safe!");
+  const [broadcasting, setBroadcasting] = useState(false);
 
   const fetchAlerts = async () => {
     setLoading(true);
@@ -131,6 +136,32 @@ export default function SmartAlertsPage() {
     }
   };
 
+  const handleSendBroadcast = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!broadcastText) return;
+    setBroadcasting(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/whatsapp/broadcast`, {
+        method: "POST",
+        headers: getAuthHeaders(),
+        credentials: "include",
+        body: JSON.stringify({ customText: broadcastText }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setIsBroadcastOpen(false);
+        fetchWaLogs();
+        alert(`🎉 Success! Broadcast sent to all ${data.totalSent} registered parents!`);
+      } else {
+        alert(data.message || "Broadcast failed");
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setBroadcasting(false);
+    }
+  };
+
   const getSeverityBadge = (severity: string) => {
     switch (severity) {
       case "CRITICAL":
@@ -149,35 +180,44 @@ export default function SmartAlertsPage() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
-            <span>💬</span> WhatsApp Instant Alerts & Security Hub
+            <span>💬</span> WhatsApp Instant Alerts & Broadcast Hub
           </h1>
           <p className="text-sm text-gray-500 dark:text-gray-400">
-            Real-time WhatsApp notifications dispatched to parents for RFID Gate Scans, Bus Tracking & Emergency SOS.
+            Automated WhatsApp alerts to respective parent numbers for RFID Gate Scans, Bus Tracking & Bulk Announcements.
           </p>
         </div>
 
-        {/* Tab Switcher */}
-        <div className="inline-flex rounded-xl bg-gray-100 dark:bg-gray-800 p-1 border border-gray-200 dark:border-gray-700">
+        <div className="flex items-center gap-3">
           <button
-            onClick={() => setActiveTab("WHATSAPP")}
-            className={`px-4 py-2 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 ${
-              activeTab === "WHATSAPP"
-                ? "bg-emerald-600 text-white shadow-md"
-                : "text-gray-600 dark:text-gray-300 hover:text-gray-900"
-            }`}
+            onClick={() => setIsBroadcastOpen(true)}
+            className="px-4 py-2 text-xs font-bold rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white shadow-md transition-all flex items-center gap-1.5"
           >
-            <span>💬</span> WhatsApp Dispatch Hub ({waLogs.length})
+            <span>📢</span> Broadcast WhatsApp to All Parents
           </button>
-          <button
-            onClick={() => setActiveTab("ALERTS")}
-            className={`px-4 py-2 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 ${
-              activeTab === "ALERTS"
-                ? "bg-brand-600 text-white shadow-md"
-                : "text-gray-600 dark:text-gray-300 hover:text-gray-900"
-            }`}
-          >
-            <span>🚨</span> Safety Alerts ({alerts.filter((a) => !a.resolved).length})
-          </button>
+
+          {/* Tab Switcher */}
+          <div className="inline-flex rounded-xl bg-gray-100 dark:bg-gray-800 p-1 border border-gray-200 dark:border-gray-700">
+            <button
+              onClick={() => setActiveTab("WHATSAPP")}
+              className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 ${
+                activeTab === "WHATSAPP"
+                  ? "bg-emerald-600 text-white shadow-md"
+                  : "text-gray-600 dark:text-gray-300 hover:text-gray-900"
+              }`}
+            >
+              <span>💬</span> Dispatch Logs ({waLogs.length})
+            </button>
+            <button
+              onClick={() => setActiveTab("ALERTS")}
+              className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 ${
+                activeTab === "ALERTS"
+                  ? "bg-brand-600 text-white shadow-md"
+                  : "text-gray-600 dark:text-gray-300 hover:text-gray-900"
+              }`}
+            >
+              <span>🚨</span> Safety Alerts ({alerts.filter((a) => !a.resolved).length})
+            </button>
+          </div>
         </div>
       </div>
 
@@ -187,10 +227,10 @@ export default function SmartAlertsPage() {
           <div className="p-6 rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 shadow-sm space-y-4">
             <div className="flex items-center justify-between border-b border-gray-100 dark:border-gray-800 pb-3">
               <span className="font-bold text-base text-gray-900 dark:text-white flex items-center gap-2">
-                <span className="text-emerald-500">📱</span> WhatsApp Instant Dispatcher
+                <span className="text-emerald-500">📱</span> Single Parent Dispatcher
               </span>
               <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300">
-                🟢 Live API Connected
+                🟢 UltraMsg Ready
               </span>
             </div>
 
@@ -249,7 +289,7 @@ export default function SmartAlertsPage() {
                 disabled={sendingWa}
                 className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm shadow-md transition-all flex items-center justify-center gap-2 disabled:opacity-50"
               >
-                <span>🚀</span> {sendingWa ? "Sending WhatsApp..." : "Send Test WhatsApp Alert"}
+                <span>🚀</span> {sendingWa ? "Sending WhatsApp..." : "Send WhatsApp Alert"}
               </button>
             </form>
 
@@ -400,6 +440,63 @@ export default function SmartAlertsPage() {
                 </div>
               ))
             )}
+          </div>
+        </div>
+      )}
+
+      {/* BROADCAST ANNOUNCEMENT MODAL */}
+      {isBroadcastOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="w-full max-w-lg bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-800 p-6 space-y-4">
+            <div className="flex items-center justify-between border-b pb-3 border-gray-200 dark:border-gray-800">
+              <div>
+                <h3 className="font-bold text-lg text-gray-900 dark:text-white flex items-center gap-2">
+                  <span>📢</span> Broadcast WhatsApp to All Registered Parents
+                </h3>
+                <p className="text-xs text-gray-500">Sends an official WhatsApp announcement to every parent phone number</p>
+              </div>
+              <button onClick={() => setIsBroadcastOpen(false)} className="text-gray-400 hover:text-gray-600 text-xl font-bold">
+                ×
+              </button>
+            </div>
+
+            <form onSubmit={handleSendBroadcast} className="space-y-4">
+              <div>
+                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Announcement Message Content
+                </label>
+                <textarea
+                  rows={4}
+                  required
+                  value={broadcastText}
+                  onChange={(e) => setBroadcastText(e.target.value)}
+                  placeholder="Type official school announcement to send to all parents..."
+                  className="w-full p-3 text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white leading-relaxed"
+                />
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 text-xs text-amber-900 dark:text-amber-200 space-y-1">
+                <p className="font-bold">⚠️ Broadcast Confirmation:</p>
+                <p>This will send a WhatsApp message to every parent registered in your school database via UltraMsg API gateway.</p>
+              </div>
+
+              <div className="flex justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsBroadcastOpen(false)}
+                  className="px-4 py-2 text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-100 rounded-lg"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={broadcasting}
+                  className="px-5 py-2 text-sm font-bold bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-lg disabled:opacity-50 shadow-md flex items-center gap-2"
+                >
+                  <span>🚀</span> {broadcasting ? "Broadcasting to All..." : "Send Broadcast Now"}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

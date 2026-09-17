@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { authenticateJWT, authorizeRoles } from '../middleware/auth.js';
-import { sendWhatsAppNotification, getWhatsAppLogs } from '../services/whatsappService.js';
+import { sendWhatsAppNotification, getWhatsAppLogs, sendBulkWhatsAppBroadcast } from '../services/whatsappService.js';
 import { prisma } from '../config/prisma.js';
 
 const router = Router();
@@ -23,6 +23,23 @@ router.post('/send-test', authenticateJWT, authorizeRoles('SUPER_ADMIN', 'ADMIN'
       details: { customText },
     });
 
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST broadcast WhatsApp announcement to ALL registered parents
+router.post('/broadcast', authenticateJWT, authorizeRoles('SUPER_ADMIN', 'ADMIN'), async (req, res, next) => {
+  try {
+    const { customText } = req.body;
+
+    if (!customText) {
+      res.status(400).json({ success: false, message: 'Announcement text is required' });
+      return;
+    }
+
+    const result = await sendBulkWhatsAppBroadcast(customText);
     res.json(result);
   } catch (err) {
     next(err);

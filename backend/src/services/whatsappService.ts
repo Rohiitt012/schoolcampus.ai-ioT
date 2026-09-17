@@ -58,7 +58,7 @@ export const sendWhatsAppNotification = async (payload: WhatsAppMessagePayload):
 
     case 'CUSTOM_TEST':
     default:
-      textContent = details?.customText || `🔔 *SMART SCHOOL TEST NOTIFICATION*\n\nHello ${parentName}, this is a test WhatsApp alert from Smart School IoT & AI System sent to ${cleanPhone} at ${timeStr}.`;
+      textContent = details?.customText || `🔔 *SMART SCHOOL OFFICIAL ANNOUNCEMENT*\n\nDear ${parentName},\nThis is an official announcement from Smart School IoT & AI System.\nTime: ${timeStr}`;
       break;
   }
 
@@ -114,6 +114,35 @@ export const sendWhatsAppNotification = async (payload: WhatsAppMessagePayload):
     success: true,
     message: `WhatsApp alert dispatched to ${cleanPhone} ${realDispatchSuccess ? '(Real WhatsApp Delivered)' : '(System Logged)'}`,
     log: logRecord,
+  };
+};
+
+/**
+ * Broadcast WhatsApp Announcement to ALL Registered Parents
+ */
+export const sendBulkWhatsAppBroadcast = async (customText: string): Promise<{ success: boolean; totalSent: number; logs: WhatsAppLogRecord[] }> => {
+  const parents = await prisma.parent.findMany({
+    include: { user: { select: { name: true } } },
+  });
+
+  const logs: WhatsAppLogRecord[] = [];
+
+  for (const parent of parents) {
+    if (parent.phone) {
+      const result = await sendWhatsAppNotification({
+        toPhone: parent.phone,
+        parentName: parent.user?.name || 'Parent',
+        messageType: 'CUSTOM_TEST',
+        details: { customText },
+      });
+      logs.push(result.log);
+    }
+  }
+
+  return {
+    success: true,
+    totalSent: logs.length,
+    logs,
   };
 };
 
