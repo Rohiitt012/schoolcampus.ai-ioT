@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
-import { API_BASE_URL } from "@/context/AuthContext";
+import { API_BASE_URL, getAuthHeaders } from "@/context/AuthContext";
 
 interface Student {
   id: string;
@@ -12,17 +12,21 @@ interface Student {
   section: string;
   rfidCardId: string;
   status: string;
-  parent?: { user?: { name: string; email: string } };
-  bus?: { busNumber: string };
+  parentId?: string | null;
+  busId?: string | null;
+  parent?: { id: string; user?: { name: string; email: string } };
+  bus?: { id: string; busNumber: string };
 }
 
 export default function StudentsPage() {
   const [students, setStudents] = useState<Student[]>([]);
+  const [buses, setBuses] = useState<any[]>([]);
+  const [parents, setParents] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [classNameFilter, setClassNameFilter] = useState("");
 
-  // Modal State
+  // Modal States
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
@@ -30,7 +34,21 @@ export default function StudentsPage() {
     className: "7-A",
     section: "A",
     rfidCardId: "",
+    busId: "",
+    parentId: "",
   });
+
+  const [editingStudent, setEditingStudent] = useState<Student | null>(null);
+  const [editFormData, setEditFormData] = useState({
+    name: "",
+    rollNumber: "",
+    className: "7-A",
+    section: "A",
+    rfidCardId: "",
+    busId: "",
+    parentId: "",
+  });
+
   const [submitting, setSubmitting] = useState(false);
 
   const fetchStudents = async () => {
@@ -41,6 +59,7 @@ export default function StudentsPage() {
       if (classNameFilter) query.append("className", classNameFilter);
 
       const res = await fetch(`${API_BASE_URL}/students?${query.toString()}`, {
+        headers: getAuthHeaders(),
         credentials: "include",
       });
       const data = await res.json();
@@ -54,8 +73,24 @@ export default function StudentsPage() {
     }
   };
 
+  const fetchBusesAndParents = async () => {
+    try {
+      const [busRes, parentRes] = await Promise.all([
+        fetch(`${API_BASE_URL}/buses`, { headers: getAuthHeaders(), credentials: "include" }),
+        fetch(`${API_BASE_URL}/parents`, { headers: getAuthHeaders(), credentials: "include" }),
+      ]);
+      const busData = await busRes.json();
+      const parentData = await parentRes.json();
+      if (busData.success) setBuses(busData.data);
+      if (parentData.success) setParents(parentData.data);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   useEffect(() => {
     fetchStudents();
+    fetchBusesAndParents();
   }, [search, classNameFilter]);
 
   const handleCreateStudent = async (e: React.FormEvent) => {
@@ -64,7 +99,7 @@ export default function StudentsPage() {
     try {
       const res = await fetch(`${API_BASE_URL}/students`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: getAuthHeaders(),
         credentials: "include",
         body: JSON.stringify(formData),
       });
@@ -77,6 +112,8 @@ export default function StudentsPage() {
           className: "7-A",
           section: "A",
           rfidCardId: "",
+          busId: "",
+          parentId: "",
         });
         fetchStudents();
       } else {
@@ -89,11 +126,50 @@ export default function StudentsPage() {
     }
   };
 
+  const handleUpdateStudent = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingStudent) return;
+    setSubmitting(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/students/${editingStudent.id}`, {
+        method: "PUT",
+        headers: getAuthHeaders(),
+        credentials: "include",
+        body: JSON.stringify(editFormData),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setEditingStudent(null);
+        fetchStudents();
+      } else {
+        alert(data.message || "Failed to update student");
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const openEditModal = (student: Student) => {
+    setEditingStudent(student);
+    setEditFormData({
+      name: student.name,
+      rollNumber: student.rollNumber,
+      className: student.className,
+      section: student.section || "A",
+      rfidCardId: student.rfidCardId,
+      busId: student.bus?.id || student.busId || "",
+      parentId: student.parent?.id || student.parentId || "",
+    });
+  };
+
   const handleDeleteStudent = async (id: string, name: string) => {
     if (!confirm(`Are you sure you want to deactivate student ${name}?`)) return;
     try {
       const res = await fetch(`${API_BASE_URL}/students/${id}`, {
         method: "DELETE",
+        headers: getAuthHeaders(),
         credentials: "include",
       });
       const data = await res.json();
@@ -112,11 +188,14 @@ export default function StudentsPage() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Student Directory</h1>
           <p className="text-sm text-gray-500 dark:text-gray-400">
-            Manage student records, RFID card assignments, and class enrollments.
+            Manage student records, RFID card assignments, bus linkages, and parent contacts.
           </p>
         </div>
         <button
-          onClick={() => setIsAddModalOpen(true)}
+          onClick={() => {
+            fetchBusesAndParents();
+            setIsAddModalOpen(true);
+          }}
           className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-brand-500 hover:bg-brand-600 text-white font-medium text-sm shadow-sm transition-all"
         >
           <span>+</span> Add New Student
@@ -210,11 +289,17 @@ export default function StudentsPage() {
                       {student.parent?.user?.name || "Not linked"}
                     </td>
                     <td className="px-6 py-4 text-right space-x-2">
+                      <button
+                        onClick={() => openEditModal(student)}
+                        className="text-xs font-medium text-amber-600 dark:text-amber-400 hover:underline border border-amber-300 dark:border-amber-700/50 px-2 py-1 rounded bg-amber-50 dark:bg-amber-900/10"
+                      >
+                        ✏️ Link Bus & Parent
+                      </button>
                       <Link
                         href={`/students/${student.id}`}
                         className="text-xs font-medium text-brand-600 dark:text-brand-400 hover:underline"
                       >
-                        View Profile
+                        Profile
                       </Link>
                       <button
                         onClick={() => handleDeleteStudent(student.id, student.name)}
@@ -290,6 +375,41 @@ export default function StudentsPage() {
                   className="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white font-mono"
                 />
               </div>
+
+              {/* Bus Selector */}
+              <div>
+                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Assign School Bus (Optional)</label>
+                <select
+                  value={formData.busId}
+                  onChange={(e) => setFormData({ ...formData, busId: e.target.value })}
+                  className="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                >
+                  <option value="">-- No Bus Assigned --</option>
+                  {buses.map((bus) => (
+                    <option key={bus.id} value={bus.id}>
+                      🚌 {bus.busNumber} ({bus.registrationNumber})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Parent Selector */}
+              <div>
+                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Link Parent Contact (Optional)</label>
+                <select
+                  value={formData.parentId}
+                  onChange={(e) => setFormData({ ...formData, parentId: e.target.value })}
+                  className="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                >
+                  <option value="">-- No Parent Linked --</option>
+                  {parents.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      👤 {p.user?.name || "Parent"} ({p.user?.email || p.phone})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
               <div className="flex justify-end gap-3 pt-3">
                 <button
                   type="button"
@@ -304,6 +424,122 @@ export default function StudentsPage() {
                   className="px-4 py-2 text-sm font-medium bg-brand-500 hover:bg-brand-600 text-white rounded-lg disabled:opacity-50"
                 >
                   {submitting ? "Saving..." : "Save Student"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit / Link Student Modal */}
+      {editingStudent && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="w-full max-w-md bg-white dark:bg-gray-900 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-800 p-6 space-y-4">
+            <div className="flex items-center justify-between border-b pb-3 border-gray-200 dark:border-gray-800">
+              <div>
+                <h3 className="font-bold text-lg text-gray-900 dark:text-white">Edit Student & Link Bus / Parent</h3>
+                <p className="text-xs text-gray-500">{editingStudent.name} (Roll: {editingStudent.rollNumber})</p>
+              </div>
+              <button onClick={() => setEditingStudent(null)} className="text-gray-400 hover:text-gray-600 text-xl font-bold">
+                ×
+              </button>
+            </div>
+            <form onSubmit={handleUpdateStudent} className="space-y-4">
+              <div>
+                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Full Name</label>
+                <input
+                  type="text"
+                  required
+                  value={editFormData.name}
+                  onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })}
+                  className="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Roll Number</label>
+                  <input
+                    type="text"
+                    required
+                    value={editFormData.rollNumber}
+                    onChange={(e) => setEditFormData({ ...editFormData, rollNumber: e.target.value })}
+                    className="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Class</label>
+                  <select
+                    value={editFormData.className}
+                    onChange={(e) => setEditFormData({ ...editFormData, className: e.target.value })}
+                    className="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                  >
+                    <option value="7-A">7-A</option>
+                    <option value="8-B">8-B</option>
+                    <option value="9-A">9-A</option>
+                    <option value="10-A">10-A</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">RFID Card Tag ID</label>
+                <input
+                  type="text"
+                  required
+                  value={editFormData.rfidCardId}
+                  onChange={(e) => setEditFormData({ ...editFormData, rfidCardId: e.target.value })}
+                  className="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white font-mono"
+                />
+              </div>
+
+              {/* Bus Selector */}
+              <div>
+                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Assigned Bus</label>
+                <select
+                  value={editFormData.busId}
+                  onChange={(e) => setEditFormData({ ...editFormData, busId: e.target.value })}
+                  className="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                >
+                  <option value="">-- Unassigned --</option>
+                  {buses.map((bus) => (
+                    <option key={bus.id} value={bus.id}>
+                      🚌 {bus.busNumber} ({bus.registrationNumber})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Parent Selector */}
+              <div>
+                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Parent Contact</label>
+                <select
+                  value={editFormData.parentId}
+                  onChange={(e) => setEditFormData({ ...editFormData, parentId: e.target.value })}
+                  className="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                >
+                  <option value="">-- Not Linked --</option>
+                  {parents.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      👤 {p.user?.name || "Parent"} ({p.user?.email || p.phone})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex justify-end gap-3 pt-3">
+                <button
+                  type="button"
+                  onClick={() => setEditingStudent(null)}
+                  className="px-4 py-2 text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="px-4 py-2 text-sm font-medium bg-brand-500 hover:bg-brand-600 text-white rounded-lg disabled:opacity-50"
+                >
+                  {submitting ? "Saving..." : "Save Changes"}
                 </button>
               </div>
             </form>
